@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { AppStep, Story, Character, Script } from './types';
 import { VISUAL_STYLES, NARRATION_LANGUAGES } from './constants';
 import * as geminiService from './services/geminiService';
@@ -10,7 +10,7 @@ const DownloadIcon = () => (<svg xmlns="http://www.w3.org/2000/svg" className="h
 const CreateNewIcon = () => (<svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110 2h5V4a1 1 0 011-1z" clipRule="evenodd" /></svg>);
 
 function App() {
-    const [hasApiKey, setHasApiKey] = useState(false);
+    // Đã xóa phần check API Key, mặc định vào thẳng app
     const [step, setStep] = useState<AppStep>(AppStep.STORY_IDEAS);
     const [isLoading, setIsLoading] = useState(false);
     const [loadingMessage, setLoadingMessage] = useState('Đang xử lý...');
@@ -32,20 +32,6 @@ function App() {
 
     // Step 4 State
     const [script, setScript] = useState<Script | null>(null);
-
-    useEffect(() => {
-        const checkApiKey = async () => {
-            const keyStatus = await window.aistudio.hasSelectedApiKey();
-            setHasApiKey(keyStatus);
-        };
-        checkApiKey();
-    }, []);
-
-    const handleSelectKey = async () => {
-        await window.aistudio.openSelectKey();
-        setHasApiKey(true); // Assume success to avoid race condition
-    };
-
 
     const handleGenerateStories = async () => {
         setIsLoading(true);
@@ -316,28 +302,7 @@ function App() {
         setScript(null);
     }
     
-    if (!hasApiKey) {
-        return (
-            <div className="flex flex-col items-center justify-center h-screen bg-slate-900 text-center p-4">
-                <h1 className="text-3xl font-bold text-amber-400 mb-4">Chào mừng đến với Trình tạo kịch bản video</h1>
-                <p className="text-slate-300 max-w-xl mb-8">
-                    Ứng dụng này sử dụng các mô hình AI tiên tiến của Google. Để bắt đầu, bạn cần chọn một API key từ dự án Google AI Studio của mình.
-                </p>
-                <button
-                    onClick={handleSelectKey}
-                    className="bg-amber-500 text-slate-900 font-bold py-3 px-6 rounded-lg hover:bg-amber-400 transition-transform transform hover:scale-105"
-                >
-                    Chọn API Key để bắt đầu
-                </button>
-                 <p className="text-xs text-slate-500 mt-6 max-w-xl">
-                    Việc sử dụng API tạo ảnh (Imagen) có thể yêu cầu tài khoản của bạn phải được bật tính năng thanh toán.
-                    <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noopener noreferrer" className="underline text-amber-500 hover:text-amber-400 ml-1">
-                        Tìm hiểu thêm
-                    </a>
-                </p>
-            </div>
-        );
-    }
+    // Đã xóa khối "if (!hasApiKey)" ở đây để không bao giờ hiện màn hình đòi key
 
     const renderStep = () => {
         switch (step) {
@@ -493,9 +458,6 @@ function App() {
             {isLoading && <Loader message={loadingMessage} />}
             <header className="flex justify-between items-center mb-8">
                 <h1 className="text-3xl md:text-4xl font-bold text-amber-400">Trình tạo kịch bản video. Liên hệ: 0916590161</h1>
-                { hasApiKey && <button onClick={handleSelectKey} className="text-sm bg-slate-700 hover:bg-slate-600 text-slate-300 font-semibold py-2 px-4 rounded-lg transition">
-                    Quản lý API Key
-                </button>}
             </header>
             <main>
                 {renderStep()}
