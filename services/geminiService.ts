@@ -86,17 +86,20 @@ export const generateStoryIdeas = async (idea: string, style: string, count: num
   try {
     const response = await ai.models.generateContent({
       model: "gemini-2.0-flash",
-      // SỬA Ở ĐÂY: Thêm khẩu lệnh ép số lượng
-      contents: `Nhiệm vụ: Tạo CHÍNH XÁC ${count} ý tưởng câu chuyện (TUYỆT ĐỐI KHÔNG ĐƯỢC TẠO NHIỀU HƠN ${count} Ý TƯỞNG).
+      // SỬA Ở ĐÂY: Thêm lệnh ép buộc Tiếng Việt
+      contents: `Nhiệm vụ: Tạo CHÍNH XÁC ${count} ý tưởng câu chuyện.
       
       Thông tin đầu vào:
       - Ý tưởng gốc: "${idea}"
       - Phong cách: "${style}"
       
-      Yêu cầu đầu ra:
-      Với mỗi ý tưởng, hãy cung cấp:
-      - "title": Tên câu chuyện (Tiếng Anh hoặc Việt tùy ngữ cảnh)
-      - "summary": Tóm tắt ngắn gọn.`,
+      Yêu cầu output (QUAN TRỌNG):
+      1. NGÔN NGỮ: BẮT BUỘC 100% TIẾNG VIỆT cho cả Tên và Tóm tắt.
+      2. Số lượng: Đúng ${count} ý tưởng (không hơn, không kém).
+      
+      Cấu trúc trả về:
+      - "title": Tên câu chuyện (Tiếng Việt hay và hấp dẫn).
+      - "summary": Tóm tắt nội dung (Tiếng Việt).`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -104,8 +107,8 @@ export const generateStoryIdeas = async (idea: string, style: string, count: num
           items: {
             type: Type.OBJECT,
             properties: {
-              title: { type: Type.STRING, description: "Tên câu chuyện" },
-              summary: { type: Type.STRING, description: "Tóm tắt câu chuyện" },
+              title: { type: Type.STRING, description: "Tên câu chuyện bằng Tiếng Việt" },
+              summary: { type: Type.STRING, description: "Tóm tắt câu chuyện bằng Tiếng Việt" },
             },
             required: ["title", "summary"],
           },
@@ -113,7 +116,7 @@ export const generateStoryIdeas = async (idea: string, style: string, count: num
       },
     });
     const jsonString = response.text.trim();
-    // Cắt bớt mảng nếu AI vẫn cố tình trả về dư (phòng hờ)
+    // Cắt bớt mảng nếu AI vẫn cố tình trả về dư
     const data = JSON.parse(jsonString);
     return data.slice(0, count); 
   } catch (error) {
