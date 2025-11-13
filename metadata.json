@@ -1,0 +1,5 @@
+{
+  "name": "[OK] Trình tạo kịch bản video",
+  "description": "A multi-step application to generate story ideas, create characters with AI-generated images, and produce a detailed video script based on user input.",
+  "requestFramePermissions": []
+}
