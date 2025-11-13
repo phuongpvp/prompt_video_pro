@@ -1,6 +1,46 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Story, Character, Script } from '../types';
 
+// --- CẤU HÌNH XOAY VÒNG API KEY ---
+const getAvailableApiKeys = (): string[] => {
+    const keys: string[] = [];
+    // Tự động quét từ Key 1 đến Key 10 (có thể tăng lên nếu bạn có nhiều hơn)
+    for (let i = 1; i <= 10; i++) {
+        // Hỗ trợ cả import.meta.env (Vite) và process.env (Node)
+        const key = import.meta.env[`VITE_GEMINI_API_KEY_${i}`] || (typeof process !== 'undefined' && process.env[`VITE_GEMINI_API_KEY_${i}`]);
+        if (key && typeof key === 'string' && key.length > 10) {
+            keys.push(key);
+        }
+    }
+    
+    // Fallback: Nếu không tìm thấy key nào theo list, thử tìm key gốc
+    if (keys.length === 0) {
+         const singleKey = import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.GEMINI_API_KEY || (typeof process !== 'undefined' && process.env.API_KEY);
+         if (singleKey) keys.push(singleKey);
+    }
+    
+    return keys;
+};
+
+const API_KEYS = getAvailableApiKeys();
+let currentKeyIndex = 0;
+
+const getNextApiKey = (): string => {
+    if (API_KEYS.length === 0) {
+        console.error("CRITICAL: Không tìm thấy API Key nào trong file .env");
+        throw new Error("Chưa cấu hình API Key. Vui lòng kiểm tra file .env.local");
+    }
+    
+    // Lấy key hiện tại và tăng index cho lần sau (Xoay vòng)
+    const key = API_KEYS[currentKeyIndex];
+    const keyId = currentKeyIndex + 1; // Để log cho dễ nhìn
+    currentKeyIndex = (currentKeyIndex + 1) % API_KEYS.length;
+    
+    console.log(`[System] Đang sử dụng API Key số #${keyId} (Tổng: ${API_KEYS.length} keys)`);
+    return key;
+};
+// ------------------------------------
+
 // Centralized error handler
 const handleGeminiError = (error: unknown, context: string): Error => {
     console.error(`Error during ${context}:`, error);
@@ -13,7 +53,7 @@ const handleGeminiError = (error: unknown, context: string): Error => {
         return new Error("Lỗi: Model AI hiện đang quá tải. Vui lòng đợi một lát rồi thử lại.");
     }
     if (errorMessage.includes('resource_exhausted') || errorMessage.includes('quota')) {
-        return new Error("Lỗi: Đã hết dung lượng (quota) cho API key hiện tại. Vui lòng nhấn nút 'Quản lý API Key' ở góc trên để chọn một key khác hoặc kiểm tra gói cước của bạn trên Google AI Studio.");
+        return new Error("Lỗi: Key hiện tại đã hết dung lượng (Quota). Hệ thống sẽ tự động chuyển sang key khác ở lần gọi tiếp theo.");
     }
     
     // Default messages based on context
@@ -33,7 +73,8 @@ const handleGeminiError = (error: unknown, context: string): Error => {
 
 
 export const generateStoryIdeas = async (idea: string, style: string, count: number): Promise<Omit<Story, 'id'>[]> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+  // Sử dụng getNextApiKey() thay vì process.env cố định
+  const ai = new GoogleGenAI({ apiKey: getNextApiKey() });
   try {
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
@@ -61,7 +102,7 @@ export const generateStoryIdeas = async (idea: string, style: string, count: num
 };
 
 export const generateCharacterDetails = async (story: Story, numCharacters: number, style: string): Promise<Omit<Character, 'id' | 'imageUrl' | 'imageMimeType' | 'isLoadingImage' | 'error'>[]> => {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+    const ai = new GoogleGenAI({ apiKey: getNextApiKey() });
     try {
         const response = await ai.models.generateContent({
             model: "gemini-2.5-pro",
@@ -93,7 +134,7 @@ Với mỗi nhân vật, cung cấp một "name" (tên) và một "prompt" (mô 
 };
 
 export const generateCharacterImage = async (prompt: string): Promise<{ imageBytes: string, mimeType: string }> => {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+    const ai = new GoogleGenAI({ apiKey: getNextApiKey() });
     try {
         const response = await ai.models.generateImages({
             model: 'imagen-4.0-generate-001',
@@ -113,7 +154,7 @@ export const generateCharacterImage = async (prompt: string): Promise<{ imageByt
 
 
 export const generateScript = async (story: Story, characters: Character[], duration: number, narrationLanguage: string): Promise<Script> => {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+    const ai = new GoogleGenAI({ apiKey: getNextApiKey() });
     const characterDescriptions = characters.map(c => `- ${c.name}: ${c.prompt}`).join('\n');
     const expectedScenes = Math.ceil(duration / 8);
 
