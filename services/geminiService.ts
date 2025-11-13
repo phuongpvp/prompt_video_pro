@@ -85,8 +85,18 @@ export const generateStoryIdeas = async (idea: string, style: string, count: num
   
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash", // Đổi sang 2.0 flash cho nhanh và rẻ hơn, ít bị limit hơn 2.5
-      contents: `Tạo ${count} ý tưởng câu chuyện dựa trên ý tưởng gốc: "${idea}" theo phong cách "${style}". Với mỗi ý tưởng, hãy cung cấp một "title" (tên câu chuyện) và một "summary" (tóm tắt ngắn).`,
+      model: "gemini-2.0-flash",
+      // SỬA Ở ĐÂY: Thêm khẩu lệnh ép số lượng
+      contents: `Nhiệm vụ: Tạo CHÍNH XÁC ${count} ý tưởng câu chuyện (TUYỆT ĐỐI KHÔNG ĐƯỢC TẠO NHIỀU HƠN ${count} Ý TƯỞNG).
+      
+      Thông tin đầu vào:
+      - Ý tưởng gốc: "${idea}"
+      - Phong cách: "${style}"
+      
+      Yêu cầu đầu ra:
+      Với mỗi ý tưởng, hãy cung cấp:
+      - "title": Tên câu chuyện (Tiếng Anh hoặc Việt tùy ngữ cảnh)
+      - "summary": Tóm tắt ngắn gọn.`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -103,7 +113,9 @@ export const generateStoryIdeas = async (idea: string, style: string, count: num
       },
     });
     const jsonString = response.text.trim();
-    return JSON.parse(jsonString);
+    // Cắt bớt mảng nếu AI vẫn cố tình trả về dư (phòng hờ)
+    const data = JSON.parse(jsonString);
+    return data.slice(0, count); 
   } catch (error) {
     throw handleGeminiError(error, 'story generation');
   }
