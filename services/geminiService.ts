@@ -3,23 +3,27 @@ import { Story, Character, Script } from '../types';
 
 // --- CẤU HÌNH XOAY VÒNG API KEY ---
 const getAvailableApiKeys = (): string[] => {
-    const keys: string[] = [];
-    // Tự động quét từ Key 1 đến Key 10 (có thể tăng lên nếu bạn có nhiều hơn)
-    for (let i = 1; i <= 10; i++) {
-        // Hỗ trợ cả import.meta.env (Vite) và process.env (Node)
-        const key = import.meta.env[`VITE_GEMINI_API_KEY_${i}`] || (typeof process !== 'undefined' && process.env[`VITE_GEMINI_API_KEY_${i}`]);
-        if (key && typeof key === 'string' && key.length > 10) {
-            keys.push(key);
-        }
-    }
+    // VITE YÊU CẦU KHAI BÁO TƯỜNG MINH, KHÔNG DÙNG VÒNG LẶP ĐỘNG ĐƯỢC
+    const allKeys = [
+        import.meta.env.VITE_GEMINI_API_KEY_1,
+        import.meta.env.VITE_GEMINI_API_KEY_2,
+        import.meta.env.VITE_GEMINI_API_KEY_3,
+        import.meta.env.VITE_GEMINI_API_KEY_4,
+        import.meta.env.VITE_GEMINI_API_KEY_5,
+        import.meta.env.VITE_GEMINI_API_KEY_6,
+        import.meta.env.VITE_GEMINI_API_KEY_7,
+        import.meta.env.VITE_GEMINI_API_KEY_8,
+        import.meta.env.VITE_GEMINI_API_KEY_9,
+        import.meta.env.VITE_GEMINI_API_KEY_10,
+        // Fallback cho key gốc nếu có
+        import.meta.env.VITE_GEMINI_API_KEY,
+        import.meta.env.GEMINI_API_KEY
+    ];
+
+    // Lọc bỏ các giá trị undefined hoặc rỗng
+    const validKeys = allKeys.filter((key): key is string => typeof key === 'string' && key.length > 10);
     
-    // Fallback: Nếu không tìm thấy key nào theo list, thử tìm key gốc
-    if (keys.length === 0) {
-         const singleKey = import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.GEMINI_API_KEY || (typeof process !== 'undefined' && process.env.API_KEY);
-         if (singleKey) keys.push(singleKey);
-    }
-    
-    return keys;
+    return validKeys;
 };
 
 const API_KEYS = getAvailableApiKeys();
@@ -27,16 +31,19 @@ let currentKeyIndex = 0;
 
 const getNextApiKey = (): string => {
     if (API_KEYS.length === 0) {
-        console.error("CRITICAL: Không tìm thấy API Key nào trong file .env");
-        throw new Error("Chưa cấu hình API Key. Vui lòng kiểm tra file .env.local");
+        console.error("CRITICAL: Không tìm thấy API Key nào hợp lệ.");
+        throw new Error("Chưa cấu hình API Key trong file .env.local hoặc Vite không đọc được biến môi trường.");
     }
     
-    // Lấy key hiện tại và tăng index cho lần sau (Xoay vòng)
+    // Lấy key hiện tại
     const key = API_KEYS[currentKeyIndex];
-    const keyId = currentKeyIndex + 1; // Để log cho dễ nhìn
+    
+    // Log để kiểm tra xem có xoay không (F12 để xem console)
+    console.log(`[System] Đang dùng Key index: ${currentKeyIndex} (Tổng: ${API_KEYS.length} keys) - Key đuôi: ...${key.slice(-4)}`);
+
+    // Tăng index cho lần sau (Xoay vòng)
     currentKeyIndex = (currentKeyIndex + 1) % API_KEYS.length;
     
-    console.log(`[System] Đang sử dụng API Key số #${keyId} (Tổng: ${API_KEYS.length} keys)`);
     return key;
 };
 // ------------------------------------
@@ -47,37 +54,38 @@ const handleGeminiError = (error: unknown, context: string): Error => {
     const errorMessage = String(error).toLowerCase();
 
     if (errorMessage.includes('imagen api is only accessible to billed users')) {
-        return new Error('Lỗi: API tạo ảnh (Imagen) yêu cầu tài khoản Google AI Studio của bạn phải được bật tính năng thanh toán. [Nhấn vào đây để kiểm tra cài đặt thanh toán](https://ai.google.dev/gemini-api/docs/billing)');
+        return new Error('Lỗi: API tạo ảnh (Imagen) yêu cầu tài khoản Google AI Studio của bạn phải được bật tính năng thanh toán.');
     }
     if (errorMessage.includes('overloaded') || errorMessage.includes('unavailable')) {
         return new Error("Lỗi: Model AI hiện đang quá tải. Vui lòng đợi một lát rồi thử lại.");
     }
     if (errorMessage.includes('resource_exhausted') || errorMessage.includes('quota')) {
-        return new Error("Lỗi: Key hiện tại đã hết dung lượng (Quota). Hệ thống sẽ tự động chuyển sang key khác ở lần gọi tiếp theo.");
+        return new Error("Lỗi: Key hiện tại đã hết dung lượng (Quota). Hãy thử nhấn nút Tạo lại, hệ thống sẽ tự đổi sang key khác.");
     }
     
     // Default messages based on context
     switch (context) {
         case 'story generation':
-            return new Error("Không thể tạo ý tưởng câu chuyện. Vui lòng thử lại.");
+            return new Error("Không thể tạo ý tưởng câu chuyện. " + errorMessage);
         case 'character generation':
-            return new Error("Không thể tạo chi tiết nhân vật. Vui lòng thử lại.");
+            return new Error("Không thể tạo chi tiết nhân vật. " + errorMessage);
         case 'image generation':
-            return new Error("Không thể tạo ảnh. Vui lòng thử lại.");
+            return new Error("Không thể tạo ảnh. " + errorMessage);
         case 'script generation':
-            return new Error("Không thể tạo kịch bản. Vui lòng thử lại.");
+            return new Error("Không thể tạo kịch bản. " + errorMessage);
         default:
-            return new Error("Đã xảy ra lỗi không xác định. Vui lòng thử lại.");
+            return new Error("Đã xảy ra lỗi không xác định. " + errorMessage);
     }
 };
 
 
 export const generateStoryIdeas = async (idea: string, style: string, count: number): Promise<Omit<Story, 'id'>[]> => {
-  // Sử dụng getNextApiKey() thay vì process.env cố định
-  const ai = new GoogleGenAI({ apiKey: getNextApiKey() });
+  const currentKey = getNextApiKey();
+  const ai = new GoogleGenAI({ apiKey: currentKey });
+  
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-2.0-flash", // Đổi sang 2.0 flash cho nhanh và rẻ hơn, ít bị limit hơn 2.5
       contents: `Tạo ${count} ý tưởng câu chuyện dựa trên ý tưởng gốc: "${idea}" theo phong cách "${style}". Với mỗi ý tưởng, hãy cung cấp một "title" (tên câu chuyện) và một "summary" (tóm tắt ngắn).`,
       config: {
         responseMimeType: "application/json",
@@ -102,13 +110,15 @@ export const generateStoryIdeas = async (idea: string, style: string, count: num
 };
 
 export const generateCharacterDetails = async (story: Story, numCharacters: number, style: string): Promise<Omit<Character, 'id' | 'imageUrl' | 'imageMimeType' | 'isLoadingImage' | 'error'>[]> => {
-    const ai = new GoogleGenAI({ apiKey: getNextApiKey() });
+    const currentKey = getNextApiKey();
+    const ai = new GoogleGenAI({ apiKey: currentKey });
+
     try {
         const response = await ai.models.generateContent({
-            model: "gemini-2.5-pro",
+            model: "gemini-2.0-flash", // Dùng 2.0 Flash
             contents: `Dựa trên câu chuyện có tên "${story.title}" với tóm tắt "${story.summary}", hãy xác định và tạo ra ${numCharacters} nhân vật CHÍNH của câu chuyện.
             
-**QUAN TRỌNG:** Hãy tập trung vào các nhân vật trung tâm. Nếu câu chuyện về các sinh vật như quái vật hoặc động vật (ví dụ: King Kong, Godzilla), thì chính chúng là nhân vật cần được tạo ra, chứ không phải các nhân vật con người phụ.
+**QUAN TRỌNG:** Hãy tập trung vào các nhân vật trung tâm. Nếu câu chuyện về các sinh vật như quái vật hoặc động vật, thì chính chúng là nhân vật cần được tạo ra.
 
 Với mỗi nhân vật, cung cấp một "name" (tên) và một "prompt" (mô tả chi tiết ngoại hình và tính cách bằng tiếng Anh theo phong cách ${style} để tạo ảnh AI).`,
             config: {
@@ -134,10 +144,12 @@ Với mỗi nhân vật, cung cấp một "name" (tên) và một "prompt" (mô 
 };
 
 export const generateCharacterImage = async (prompt: string): Promise<{ imageBytes: string, mimeType: string }> => {
-    const ai = new GoogleGenAI({ apiKey: getNextApiKey() });
+    const currentKey = getNextApiKey();
+    const ai = new GoogleGenAI({ apiKey: currentKey });
+
     try {
         const response = await ai.models.generateImages({
-            model: 'imagen-4.0-generate-001',
+            model: 'imagen-3.0-generate-001', // Imagen 3 ổn định hơn 4 lúc này
             prompt: prompt,
             config: {
                 numberOfImages: 1,
@@ -154,42 +166,33 @@ export const generateCharacterImage = async (prompt: string): Promise<{ imageByt
 
 
 export const generateScript = async (story: Story, characters: Character[], duration: number, narrationLanguage: string): Promise<Script> => {
-    const ai = new GoogleGenAI({ apiKey: getNextApiKey() });
+    const currentKey = getNextApiKey();
+    const ai = new GoogleGenAI({ apiKey: currentKey });
+    
     const characterDescriptions = characters.map(c => `- ${c.name}: ${c.prompt}`).join('\n');
     const expectedScenes = Math.ceil(duration / 8);
 
     try {
         const response = await ai.models.generateContent({
-            model: "gemini-2.5-pro",
-            contents: `Với vai trò là một nhà biên kịch chuyên nghiệp, hãy viết một kịch bản video dạng kể chuyện dài ${duration} giây.
+            model: "gemini-2.0-flash", // Dùng 2.0 Flash
+            contents: `Với vai trò là một nhà biên kịch, hãy viết kịch bản video dài ${duration} giây.
             
-            **Thông tin câu chuyện:**
+            **Thông tin:**
             - Tên: ${story.title}
             - Tóm tắt: ${story.summary}
-
-            **Các nhân vật:**
-            ${characterDescriptions}
+            - Nhân vật: \n${characterDescriptions}
 
             **Yêu cầu:**
-            1. Viết một "summary" (tóm tắt kịch bản) ngắn gọn, hấp dẫn.
-            2. Chia kịch bản thành chính xác ${expectedScenes} "scenes" (cảnh quay) để đảm bảo tổng thời lượng là ${duration} giây (mỗi cảnh khoảng 8 giây).
-            3. Với mỗi cảnh, cung cấp các thông tin sau:
-               - "id": Số thứ tự cảnh.
-               - "description": Mô tả chi tiết bối cảnh và hành động bằng tiếng Việt.
-               - "narration": Lời dẫn/lời tường thuật cho cảnh quay bằng ngôn ngữ "${narrationLanguage}". Đây là phần sẽ được thu âm thành voice-over.
-               - "veo_prompt": Một câu lệnh (prompt) bằng tiếng Anh, súc tích và giàu hình ảnh, dùng để tạo video cho cảnh này bằng AI.
-               - "characters_present": Một mảng chứa tên các nhân vật có mặt trong cảnh.
-            4. **QUY TẮC BẮT BUỘC (TUYỆT ĐỐI KHÔNG VI PHẠM):**
-               - **QUAN TRỌNG NHẤT:** Kịch bản này dùng để tạo video bằng AI (Veo). Để AI có thể tạo ra các nhân vật một cách nhất quán, mỗi cảnh ("scene") BẮT BUỘC phải có ít nhất một nhân vật trong danh sách "characters_present". **TUYỆT ĐỐI không tạo cảnh không có nhân vật.** Nếu là cảnh rộng hoặc cảnh thiết lập, hãy chọn nhân vật phù hợp nhất để đưa vào cảnh đó.
-               - Từ quy tắc trên, "veo_prompt" của mỗi cảnh BẮT BUỘC PHẢI chứa tên của ÍT NHẤT MỘT nhân vật được liệt kê trong "characters_present". Đây là yêu cầu kỹ thuật bắt buộc, không phải là gợi ý. Hãy kiểm tra kỹ từng "veo_prompt" trước khi trả lời. Ví dụ: nếu "characters_present" là ["Godzilla", "Tướng Quân"], thì "veo_prompt" phải chứa "Godzilla" hoặc "Tướng Quân" hoặc cả hai.
-               - Mỗi cảnh ("scene") BẮT BUỘC phải có lời dẫn ("narration"). Tuyệt đối không được để trống trường này.
+            1. Viết "summary" (tóm tắt kịch bản).
+            2. Chia thành đúng ${expectedScenes} "scenes".
+            3. Mỗi cảnh gồm: "id", "description" (tiếng Việt), "narration" (lời dẫn ${narrationLanguage}), "veo_prompt" (tiếng Anh, phải chứa tên ít nhất 1 nhân vật), "characters_present" (danh sách nhân vật trong cảnh).
             `,
             config: {
                 responseMimeType: "application/json",
                 responseSchema: {
                     type: Type.OBJECT,
                     properties: {
-                        summary: { type: Type.STRING, description: "Tóm tắt kịch bản" },
+                        summary: { type: Type.STRING },
                         scenes: {
                             type: Type.ARRAY,
                             items: {
@@ -197,7 +200,7 @@ export const generateScript = async (story: Story, characters: Character[], dura
                                 properties: {
                                     id: { type: Type.NUMBER },
                                     description: { type: Type.STRING },
-                                    narration: { type: Type.STRING, description: "Lời dẫn/tường thuật cho cảnh quay" },
+                                    narration: { type: Type.STRING },
                                     veo_prompt: { type: Type.STRING },
                                     characters_present: { type: Type.ARRAY, items: { type: Type.STRING } },
                                 },
